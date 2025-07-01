@@ -401,21 +401,21 @@ void do_bytes_rotation_1201(uint8_t* SI, uint8_t* DI) {
 	printf("\n");
 struct __attribute__((__packed__)) _user_entry {
 	char username[0x10];
-	uint16_t maybe_date;
+	uint16_t unknown_word; //check at 0100:3780
+	uint32_t timestamp; //maybe ? 0100:37aa
 };
 struct __attribute__((__packed__)) user_entry {
 	struct _user_entry entry;
 	uint8_t b[0x60-sizeof(struct _user_entry)];
 };
 void print_user_entry(struct user_entry *user){
-	uint16_t t = user->entry.maybe_date;
 	printf(
 		"\"user\" : {\n"
 		"  \"name\": \"%s\",\n"
-		"  \"time\": \"%02d:%02d:%02d\"\n"
+		"  \"timestamp\": %d\n"
 		"}\n",
 		(char*)user->entry.username,
-		t >> 11, t >> 5 & 0x3f, t & 0x1f	
+		user->entry.timestamp
 	);
 }
 int main(int argc, char **argv){
