@@ -1,0 +1,188 @@
+- AES256.sys: - Key in EDI:
+		- struct {
+			uint8_t boolstuff;
+			uint8_t _;
+			uint8_t _;
+			uint8_t _;
+			uint8_t _;
+			uint32_t ptr_key?;
+		}
+
+        00010bba 9c              PUSHFD
+        00010bbb 60              PUSHAD
+        00010bbc fc              CLD
+        00010bbd 8b ec           MOV        EBP,ESP
+        00010bbf 83 ec 04        SUB        ESP,0x4
+        00010bc2 c6 45 fc 20     MOV        byte ptr [EBP + local_28],0x20
+        00010bc6 f6 07 01        TEST       byte ptr [EDI],0x1
+        00010bc9 8d 7f 04        LEA        EDI,[EDI + 0x4]
+
+
+- mem2.img:
+		WG4BKC9I71PLXU6ASRJND2EYT8FZ53MV
+		00015d40: 46fe ebd7 5ec9 c390 5747 3442 4b43 3949  F...^...WG4BKC9I
+		00015d50: 3731 504c 5855 3641 5352 4a4e 4432 4559  71PLXU6ASRJND2EY
+		00015d60: 5438 465a 3533 4d56 0915 1d02 1c0e 0819  T8FZ53MV........
+
+- gdb: 
+	set architecture i8086
+	b *0xf1aa (== 0x01aa)
+	target remote 10.154.199.150:1234
+
+- boot.bin:
+	read 0x51 sectors to addr 0x0100:0000 (512B*0xBA):
+
+							 LBA packet (16bits)
+		0000:00ca 10              db         10h
+		0000:00cb 00              db         0h
+		0000:00cc 01 00           dw         1h
+		0000:00ce 00 00           dw         0h
+							 addr read 1block
+		0000:00d0 00 01           dw         100h
+		0000:00d2 68 8a 1e 00     ddw        1E8A68h
+		0000:00d6 00 00           dw         0h
+							 End LBA Packet
+		//////////////////////////////////////////////////////////////////
+		0000:0143 a0 ba 00        MOV        AL,[0xba]  //static 0x51 byte
+		0000:0146 a2 cc 00        MOV        [0xcc],AL  //static DAP struct n_sectors 
+
+- decrypt.bin:
+	
+	username hash already in:
+		0100:00cc
+			010000CC: 64 B4 EA 98 2F 94 BB 3C 7E E7 9A 1F 14 AD 7B EA  d.../..<~.....{.
+		hashing fn @0100:3504
+
+	XOR disk data with unix_rand():
+
+		0100:6b50
+	
+	0100:7640 24 49 4e        ds         "$INT13SFutimaco "
+			  54 31 33 
+			  53 46 75 
+
+	0100:2c8b (0x3c8b gdb) read from disk fn
+
+	b *0x3217:
+		DAP packet in DS:SI
+		read address usually in ES:DI	
+		
+	Interegeant:
+
+		Program received signal SIGTRAP, Trace/breakpoint trap.
+		---------------------------[ STACK ]---
+		DB45 C55D DB2D D52E 7C7C 8AA3 BEF7 ED33
+		BDD4 891C 0000 0000 0000 0000 0000 0000
+		---------------------------[ DS:SI ]---
+		0100FFC5: 64 B4 EA 98 2F 94 BB 3C 7E E7 9A 1F 14 AD 7B EA  d.../..<~.....{.
+		0100FFD5: 2A 41 55 54 4F 55 53 45 52 F7 2A 41 55 54 4F 55  *AUTOUSER.*AUTOU
+		0100FFE5: 00 2A 8A 00 F0 46 02 40 01 F9 B6 84 6D 00 01 D7  .*...F.@....m...
+		0100FFF5: 02 1C 00 CE 3E 3E 6C 10 5B 00 00 4D 5A E1 01 23  ....>>l.[..MZ..#
+		---------------------------[ ES:DI ]---
+		0100FFC5: 64 B4 EA 98 2F 94 BB 3C 7E E7 9A 1F 14 AD 7B EA  d.../..<~.....{.
+		0100FFD5: 2A 41 55 54 4F 55 53 45 52 F7 2A 41 55 54 4F 55  *AUTOUSER.*AUTOU
+		0100FFE5: 00 2A 8A 00 F0 46 02 40 01 F9 B6 84 6D 00 01 D7  .*...F.@....m...
+		0100FFF5: 02 1C 00 CE 3E 3E 6C 10 5B 00 00 4D 5A E1 01 23  ....>>l.[..MZ..#
+		----------------------------[ CPU ]----
+		AX: 0001 BX: 0001 CX: 0004 DX: 0010
+		SI: FFC5 DI: FFC5 SP: FF46 BP: FFF6
+		CS: 0100 DS: 0100 ES: 0100 SS: 0100
+
+		IP: 3590 EIP:00003590
+		CS:IP: 0100:3590 (0x04590)
+		SS:SP: 0100:FF46 (0x10F46)
+		SS:BP: 0100:FFF6 (0x10FF6)
+		OF <0>  DF <0>  IF <1>  TF <0>  SF <0>  ZF <1>  AF <0>  PF <1>  CF <0>
+		ID <0>  VIP <0> VIF <0> AC <0>  VM <0>  RF <0>  NT <0>  IOPL <0>
+		---------------------------[ CODE ]----
+		   0x4590:      je     0x45ce
+		   0x4592:      mov    ah,0x1
+		   0x4594:      mov    dx,0x10
+		   0x4597:      lea    bx,[bp-0x41]
+		   0x459a:      mov    cl,BYTE PTR [bp-0x42]
+		   0x459d:      call   0x7ba1
+		   0x45a0:      lea    si,[bp-0x41]
+		   0x45a3:      lea    di,[bp-0x31]
+		   0x45a6:      mov    cx,0x10
+
+	remap des interrupts:
+		int13h:
+
+			real-mode-gdb$ x/2hx 0x004c
+			0x4c:   0xe3fe  0xf000
+	
+			real-mode-gdb$ x/2hx 0x004c
+			0x4c:   0x05dd  0x9c40  == 0x9c9dd
+
+	int13h:
+		datastruct size(0xc) @0x9c400 (CS:0x0) with drive num as first byte
+ 
+				0x9c400:       ^0x80    0xfe    0xfe    0x03    0xc1    0x3e    0x3f    0x87
+				0x9c408:        0x90    0x2f    0x50    0x09   ^0x81    0x00    0x00    0x00
+				0x9c410:        0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00		
+		CS:0x30: N of the struct
+			0x9c430:        0x02
+
+		CS:0x386: Selected drive struct
+			0x9c786:        0x0000
+
+		DS:0x374: Save CHS registers
+			0x9c774:        0x0201  0x7c00  0x0001  0x0080  0x4b9c  0xeff0  0x0000
+							AX		BX		CX		DX		SI		DI		ES
+			0x9c774:        0x0201  0x7c00  0x4001  0x0080  0x07fe  0x0005  0x0000
+
+		DS:0x390: Save derived value from datastruct (uint16_t)struct[0x4] * CX (0100:7410)
+			0x9c790:        0xb040
+
+		0x9cfd2:     rep movs WORD PTR es:[di],WORD PTR ds:[si]]]	
+
+		real-mode-gdb$ x /32bx 0x9e128
+
+		0x9e128:        0x3a    0x3e    0xad    0xb0    0x74    0x59    0x9b    0x2e
+		0x9e130:        0xfc    0xc0    0xb2    0x0b    0x6e    0x8c    0x3d    0xa3
+		0x9e138:        0x94    0x89    0x8a    0x16    0x62    0x01    0xca    0xdc
+		0x9e140:        0xcd    0x3e    0x64    0xae    0x13    0x8e    0x0e    0x4d
+
+		once remapped only works with CHS:
+
+		"""
+		Cylinder = 0 to 1023 (maybe 4095), Head = 0 to 15 (maybe 254, maybe 255), Sector = 1 to 63
+		Set AH = 2
+		AL = total sector count (0 is illegal) -- cannot cross ES page boundary, or a cylinder boundary, and must be < 128
+		CH = cylinder & 0xff
+		CL = Sector | ((cylinder >> 2) & 0xC0);
+		DH = Head -- may include two more cylinder bits
+		ES:BX -> buffer
+		Set DL = "drive number" -- typically 0x80, for the "C" drive
+		Issue an INT 0x13.
+		""""
+	b *0x3b6d
+	//inject shellcode @0x1000 MAX_SIZE 0x2a94
+	b *0x0000101b
+	nasm -f bin exploit.asm -o exploit.bin
+	target rerestore exploit.bin binary 0x1000
+	set $cs = 0
+	jump *0x1000
+	dump binary memory 01.bin 0x102f 0x10e2f
+		
+stage3.bin:
+	0x15039:
+		ignore jump to stop wait
+		0x15097 follow jump to stop wait
+
+	username stored @0040:0024 "utflike"		
+		real-mode-gdb$ x /s 0x424
+		0x424:  "f!o\030o\030b0q\036r\023"""
+	alse stored here after validation:
+		164B:172F: 00 07 61 66 6F 6F 62 71 72 00 00 00 00 00 00 00  ..afoobqr.......
+	password while typing:
+		real-mode-gdb$ x /64c 0x42C
+		0x42c:  70 'F'  33 '!'  111 'o' 24 '\030'       111 'o' 24 '\030'       98 'b'  48 '0'
+		0x434:  97 'a'  30 '\036'       114 'r' 19 '\023'       50 '2'  3 '\003'        48 '0'  11 '\v'
+		0x43c:  48 '0'  11 '\v' 1 '\001'        0 '\000'        0 '\000'        32 ' '  64 '@'  0 '\000'''''''''''''''''''''''''''''''''''''''''''''''''	
+
+boot3.bin:
+
+	0x6d6:
+		read to 0x7c00 512B new bootloader:
+			sector 0/1(CHS) cylinder 0x40 head 0x0 == boot3.bin
