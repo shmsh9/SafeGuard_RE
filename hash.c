@@ -399,9 +399,25 @@ void do_bytes_rotation_1201(uint8_t* SI, uint8_t* DI) {
         if ((i + 1) % 8 == 0) printf("\n"); \
 	} \
 	printf("\n");
-struct __attribute__((__packed__)) user_entry {
-	uint8_t b[0x60];
+struct __attribute__((__packed__)) _user_entry {
+	char username[0x10];
+	uint16_t maybe_date;
 };
+struct __attribute__((__packed__)) user_entry {
+	struct _user_entry entry;
+	uint8_t b[0x60-sizeof(struct _user_entry)];
+};
+void print_user_entry(struct user_entry *user){
+	uint16_t t = user->entry.maybe_date;
+	printf(
+		"\"user\" : {\n"
+		"  \"name\": \"%s\",\n"
+		"  \"time\": \"%02d:%02d:%02d\"\n"
+		"}\n",
+		(char*)user->entry.username,
+		t >> 11, t >> 5 & 0x3f, t & 0x1f	
+	);
+}
 int main(int argc, char **argv){
 	if(!argv[1]){
 		printf("usage: %s string\n", argv[0]);
@@ -482,7 +498,7 @@ int main(int argc, char **argv){
 	//db in in4
 	struct user_entry *db = (struct user_entry*)in4;
 	for(int i = 0; i < 5; i++){
-		printf("%s\n", db[i]);
+		print_user_entry(&db[i]);
 	}
 
 	free(buff);

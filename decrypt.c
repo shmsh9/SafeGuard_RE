@@ -10,7 +10,6 @@ uint16_t myrand(uint32_t *seed){
 
 int main(int argc, char **argv){
 	if(!argv[1]){
-
 		printf("usage %s file\n", argv[0]);
 		return -1;
 	}
