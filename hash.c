@@ -400,9 +400,14 @@ void do_bytes_rotation_1201(uint8_t* SI, uint8_t* DI) {
 	} \
 	printf("\n");
 struct __attribute__((__packed__)) _user_entry {
-	char username[0x10];
-	uint16_t unknown_word; //check at 0100:3780
-	uint32_t timestamp; //maybe ? 0100:37aa
+	char username[0x10];      // [0..0x0f]
+	uint8_t unknown_0[2];     // [0x10..0x11]
+	uint16_t unknown_word;    // [0x12] 0100:3780
+	uint16_t timestamp_cx;    // [0x14] 0100:37ad
+	uint16_t timestamp_dx;    // [0x16] 0100:37aa
+	uint8_t unknown[3];       // [0x17..0x19]
+	uint16_t syscall_0x10_dx; // [0x1a] 0100:3879
+	uint16_t syscall_0x10_cx; // [0x1c] 0100:3876
 };
 struct __attribute__((__packed__)) user_entry {
 	struct _user_entry entry;
@@ -412,10 +417,10 @@ void print_user_entry(struct user_entry *user){
 	printf(
 		"\"user\" : {\n"
 		"  \"name\": \"%s\",\n"
-		"  \"timestamp\": %d\n"
+		"  \"timestamp\": \"%02X:%02X\"\n"
 		"}\n",
 		(char*)user->entry.username,
-		user->entry.timestamp
+		user->entry.timestamp_dx, user->entry.timestamp_cx
 	);
 }
 int main(int argc, char **argv){
@@ -423,6 +428,7 @@ int main(int argc, char **argv){
 		printf("usage: %s string\n", argv[0]);
 		return -1;
 	}
+	static_assert(sizeof(struct user_entry) == 0x60);
 	int l = strlen(argv[1]);	
 	char *s = strdup(argv[1]);
 
