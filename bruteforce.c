@@ -2,6 +2,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+
 static inline uint8_t ror8(uint8_t value, uint8_t count) {
     count &= 7;  // mask to 0-7 bits
     return (value >> count) | (value << (8 - count));
@@ -585,50 +588,145 @@ const uint8_t target_hash[] ={
 	0x82, 0xA6, 0xD0, 0x99,
 	0xA1, 0xF2, 0x3B, 0x9F
 };
-int main(int argc, char **argv){
-	if(!argv[1]){
-		printf("usage: %s dictionary\n", argv[0]);
-		return -1;
-	}
-	static_assert(sizeof(struct user_entry) == 0x60);
-	//create obfuscated pass as read from input box
-	FILE *f = fopen(argv[1], "r");
-	if(!f){
-		printf("cannot open %s\n", argv[1]);
-		return -1;
-	}
-	char *line = NULL;
-	size_t len = 0;
-	int read = 0;
+typedef struct {
+    char **lines;
+    int start;
+    int end;
+} thread_data_t;
 
-	while((read = getline(&line, &len, f)) != -1){
-		int strsz = read - 1;
-		line[strsz] = 0x0;
-		char *cpline = strdup(line);
-		for(int i = 0; i < strsz; i++){
-			line[i] = ascii_2_scancode[line[i]] | 0x80;
-		}
-		uint8_t s2[0x24] = {0};
-		uint8_t extended_pass[0x10] = {0};
-		create_DL_bytes_buff_from_input(
-			(uint8_t*)line, //src
-			extended_pass, //dst 
-			sizeof(extended_pass), //dst len
-			strsz, //src len
-			0 //ah flag 0 for password
-		);
-		uint8_t pass_hash[16] = {0};
-		static_assert(sizeof(pass_hash) == sizeof(target_hash));
-		//seed for password (username is 0xb71d)
-		uint16_t bx = 0xc2d5;
-		for(int i = 0; i < sizeof(pass_hash); i++){
-			hashing_username(extended_pass+i, sizeof(pass_hash), pass_hash, &bx);
-		}
-		if(!memcmp(target_hash, pass_hash, sizeof(pass_hash))){
-			printf("found pass/collision : %s\n", cpline);
-		}
-		free(cpline);
-	}
-	if(line)
-		free(line);
+// --- worker thread function ---
+void *worker_thread(void *arg) {
+    thread_data_t *td = (thread_data_t *)arg;
+
+    for (int idx = td->start; idx < td->end; idx++) {
+        char *orig = td->lines[idx];
+        if (!orig) continue;
+
+        char *line = strdup(orig);
+        if (!line) continue;
+
+        int strsz = (int)strlen(line);
+
+        for (int i = 0; i < strsz; i++) {
+            uint8_t ch = (uint8_t)line[i];
+            line[i] = ascii_2_scancode[ch] | 0x80;
+        }
+
+        uint8_t extended_pass[0x10] = {0};
+        create_DL_bytes_buff_from_input(
+            (uint8_t *)line, extended_pass, sizeof(extended_pass), strsz, 0
+        );
+
+        uint8_t pass_hash[16] = {0};
+        uint16_t bx = 0xc2d5;
+
+        for (int i = 0; i < (int)sizeof(pass_hash); i++) {
+            hashing_username(extended_pass + i, sizeof(pass_hash), pass_hash, &bx);
+        }
+
+        if (!memcmp(target_hash, pass_hash, sizeof(pass_hash))) {
+            printf("[+] Found password: %s\n", orig);
+        }
+
+        free(line);
+    }
+
+    return NULL;
 }
+
+// --- main function ---
+int main(int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr, "usage: %s dictionary\n", argv[0]);
+        return 1;
+    }
+
+    FILE *f = fopen(argv[1], "r");
+    if (!f) {
+        perror("fopen");
+        return 1;
+    }
+
+    size_t capacity = 128;
+    size_t count = 0;
+    char **lines = malloc(capacity * sizeof(char *));
+    if (!lines) {
+        perror("malloc");
+        fclose(f);
+        return 1;
+    }
+
+    char *line = NULL;
+    size_t len = 0;
+
+    while (getline(&line, &len, f) != -1) {
+        if (count >= capacity) {
+            capacity *= 2;
+            char **tmp = realloc(lines, capacity * sizeof(char *));
+            if (!tmp) {
+                perror("realloc");
+                break; // stop reading more lines
+            }
+            lines = tmp;
+        }
+        size_t linelen = strlen(line);
+        if (linelen > 0 && line[linelen - 1] == '\n') {
+            line[linelen - 1] = '\0'; // strip newline
+        }
+        lines[count] = strdup(line);
+        if (!lines[count]) {
+            perror("strdup");
+            break;
+        }
+        count++;
+    }
+    free(line);
+    fclose(f);
+
+    if (count == 0) {
+        fprintf(stderr, "No lines read from file.\n");
+        free(lines);
+        return 1;
+    }
+
+    // Detect number of CPU cores for threading
+    long num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    if (num_cpus < 1) {
+        num_cpus = 4; // fallback
+    }
+    int num_threads = (int)num_cpus;
+
+    pthread_t *threads = malloc(num_threads * sizeof(pthread_t));
+    thread_data_t *thread_data = malloc(num_threads * sizeof(thread_data_t));
+    if (!threads || !thread_data) {
+        perror("malloc threads");
+        for (size_t i = 0; i < count; i++) free(lines[i]);
+        free(lines);
+        free(threads);
+        free(thread_data);
+        return 1;
+    }
+
+    int chunk = (count + num_threads - 1) / num_threads;
+    for (int i = 0; i < num_threads; i++) {
+        thread_data[i].lines = lines;
+        thread_data[i].start = i * chunk;
+        thread_data[i].end = (i + 1) * chunk;
+        if (thread_data[i].end > (int)count) thread_data[i].end = (int)count;
+        pthread_create(&threads[i], NULL, worker_thread, &thread_data[i]);
+    }
+
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        free(lines[i]);
+    }
+    free(lines);
+    free(threads);
+    free(thread_data);
+
+    return 0;
+}
+
