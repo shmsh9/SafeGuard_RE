@@ -199,5 +199,12 @@ read as :
 		stepi
 		continue
 
-	b *0x000045f5
-		check passhash
+	//force correct *AUTOUSER hash
+	b *0x45eb
+		set *(unsigned int*)0x010FC5 = 0xCB79240E
+		set *(unsigned int*)0x010FC9 = 0x0171232B
+		set *(unsigned int*)0x010FCD = 0x5132132E
+		set *(unsigned int*)0x010FD1 = 0x5A16C97A
+
+	new pass *AUTOUSER:
+		poiuypoiuy
