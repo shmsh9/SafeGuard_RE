@@ -186,3 +186,18 @@ boot3.bin:
 	0x6d6:
 		read to 0x7c00 512B new bootloader:
 			sector 0/1(CHS) cylinder 0x40 head 0x0 == boot3.bin
+
+password :
+
+read as :
+	\size, scancode | 0x81
+	create 16bytes buff[1..size] //do not use size
+	hash buff
+	
+	b *0x00004a30 
+		set $ax = 0x0000
+		stepi
+		continue
+
+	b *0x000045f5
+		check passhash

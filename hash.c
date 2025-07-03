@@ -525,7 +525,7 @@ int main(int argc, char **argv){
 		0xAA, 0x44, 0xA9, 0x98, 
 		0xBF, 0x09, 0xC4, 0xB0
 	};
-	//decrypt key
+	//decrypt key with key derived from pw
 	do_bytes_rotation_1201(in3, rebuff);
 	do_bytes_rotation_1201(in3+8, rebuff);
 	PHEX(in3);
