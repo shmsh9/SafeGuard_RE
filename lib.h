@@ -9,10 +9,10 @@
 	printf("\n");
 
 void dosdatefmt(char dst[20], uint16_t time, uint16_t date){
-	static_assert(sizeof("16:01:00/16:06:2025") == 20);
+	static_assert(sizeof("16:01:00 16/06/2025") == 20);
 	dst[19] = 0;
 	sprintf(dst,
-		"%02d:%02d:%02d/%02d:%02d:%04d",
+		"%02d:%02d:%02d %02d/%02d/%04d",
 		time >> 11 & 0x1f,
 		time >> 5 & 0x3f,
 		(time & 0x1f) * 2,
