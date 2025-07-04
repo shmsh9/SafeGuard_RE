@@ -208,3 +208,4 @@ read as :
 
 	new pass *AUTOUSER:
 		poiuypoiuy
+	openssl enc -aes-256-cbc -d -K 3A3EADB074599B2EFCC0B20B6E8C3DA394898A166201CADCCD3E64AE138E0E4D -nopad -in encrypted.img -out decrypted.bin -iv 00000000000000000000000000000000
