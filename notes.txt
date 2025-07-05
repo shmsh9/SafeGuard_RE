@@ -208,5 +208,28 @@ read as :
 
 	new pass *AUTOUSER:
 		poiuypoiuy
-	openssl enc -aes-256-cbc -d -K 3A3EADB074599B2EFCC0B20B6E8C3DA394898A166201CADCCD3E64AE138E0E4D -nopad -in encrypted.img -out decrypted.bin -iv 42b00f0042b00f0042b00f0042b00f00
+	openssl enc -aes-256-cbc -d -K 3A3EADB074599B2EFCC0B20B6E8C3DA394898A166201CADCCD3E64AE138E0E4D -nopad -in encrypted.img -out decrypted.bin -iv 40b00f0040b00f0040b00f0040b00f00
+	base iv is = 40b00f0040b00f0040b00f0040b00f00
+	aktchually impl here IV(LBA_ADDRESS) 0100:7410
+		void lba_to_iv(uint64_t lba, uint8_t iv[16]) {
+			const uint32_t sectors_per_track = 63;
+			const uint32_t heads = 16;
 
+			uint32_t sector = (lba % sectors_per_track) + 1;
+			uint32_t temp = lba / sectors_per_track;
+			uint32_t head = temp % heads;
+			uint32_t cylinder = temp / heads;
+
+			uint32_t lba_calc = (cylinder * heads + head) * sectors_per_track + (sector - 1);
+
+			uint16_t ax = lba_calc & 0xFFFF;
+			uint16_t dx = (lba_calc >> 16) & 0xFFFF;
+
+			for (int i = 0; i < 4; i++) {
+				iv[i * 4 + 0] = ax & 0xFF;
+				iv[i * 4 + 1] = (ax >> 8) & 0xFF;
+				iv[i * 4 + 2] = dx & 0xFF;
+				iv[i * 4 + 3] = (dx >> 8) & 0xFF;
+			}
+		}
+	
