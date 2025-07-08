@@ -2,7 +2,7 @@ n effort to reverse engineer utimaco SafeGuard Easy 4.2.1
 
 ### bootloader
 The bootloader code is encrypted using the rand() function initialized with seed 0x23c97de1 and XORING each 16bits blocks with the result of rand():
-```
+```C
 uint16_t rand(uint32_t *seed){
     *seed = (0x343fdu * *seed) + 0x269ec3u;
     return *seed >> 16;
@@ -17,7 +17,7 @@ At this address Each 16 bytes value is the "master" key encrypted using the user
 Each entry is an user.
 Each char of the password is saved as bios `(scancode | 0x80)`
 The password is hashed like this:
-```
+```C
 char *username_padded = create_DL_bytes_buff_from_input(password, 0x10, strlen(password)); //return a 16bytes buffer with the password repeating itself if shorter than 16 bytes
 hash_seed = 0xc2d5; //the seed for a username is 0xb71d;
 uint8_t password_hash[0x10] = {0};
@@ -29,7 +29,7 @@ for(int i = 0; i < sizeof(out); i++){
 ### Encryption
 #### Every sector (512 bytes) is encrypted using the 32 bytes AES256 key decrypted by the "master key".
 ##### To decrypt a sector you need to calculate it's IV using it's LBA address:
-```
+```C
 void lba_to_iv(uint64_t lba, uint8_t iv[16]) {
         const uint32_t sectors_per_track = 63;
         const uint32_t heads = 16;
